@@ -1,0 +1,47 @@
+name: Costruisci APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Prepara il progetto
+        run: |
+          mkdir -p work/app/src/main/java/it/leonardo/antivirus
+          cp settings.gradle.kts work/settings.gradle.kts
+          cp root.gradle.kts work/build.gradle.kts
+          cp app.gradle.kts work/app/build.gradle.kts
+          cp gradle.properties work/gradle.properties
+          cp AndroidManifest.xml work/app/src/main/AndroidManifest.xml
+          cp *.java work/app/src/main/java/it/leonardo/antivirus/
+
+      - name: Costruisci l'app
+        working-directory: work
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Prepara il file da installare
+        run: cp work/app/build/outputs/apk/debug/app-debug.apk leonardo-antivirus.apk
+
+      - name: Pubblica l'app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ultima --yes --cleanup-tag || true
+          gh release create ultima leonardo-antivirus.apk --title "Leonardo Antivirus" --notes "Versione costruita automaticamente. Scarica leonardo-antivirus.apk e installalo." --target "${{ github.sha }}"
